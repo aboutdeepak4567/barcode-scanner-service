@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Determine the API base URL based on where the UI is hosted
+    // When deploying the backend to Render, replace the placeholder below with your actual Render URL!
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const API_BASE_URL = isLocalhost 
+        ? 'http://localhost:8080' 
+        : 'https://YOUR_BACKEND_APP_NAME.onrender.com'; // <-- UPDATE THIS
+
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -66,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', file);
 
         try {
-            const response = await fetch('/api/v1/scan', {
+            const response = await fetch(`${API_BASE_URL}/api/v1/scan`, {
                 method: 'POST',
                 body: formData
             });

@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Slf4j
 @RestController
+@CrossOrigin(origins = "*") // Allows the Vercel UI to communicate with this backend
 @RequestMapping("/api/v1/scan")
 @Tag(name = "Barcode Scanner", description = "API for scanning barcodes from images")
 public class BarcodeScannerController {
