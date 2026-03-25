@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const API_BASE_URL = isLocalhost 
         ? 'http://localhost:8080' 
-        : 'https://YOUR_BACKEND_APP_NAME.onrender.com'; // <-- UPDATE THIS
+        : 'https://barcode-scanner-microservice.onrender.com';
 
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
