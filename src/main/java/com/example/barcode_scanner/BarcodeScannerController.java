@@ -7,10 +7,18 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/scan")
+@Tag(name = "Barcode Scanner", description = "API for scanning barcodes from images")
 public class BarcodeScannerController {
 
     private final BarcodeScannerService barcodeScannerService;
@@ -19,8 +27,17 @@ public class BarcodeScannerController {
         this.barcodeScannerService = barcodeScannerService;
     }
 
-    @PostMapping
-    public ResponseEntity<Map<String, Object>> scanBarcode(@RequestParam("file") MultipartFile file) {
+    @Operation(summary = "Scan a barcode from an uploaded image", description = "Uploads an image, processes it using OpenCV and ZXing, and returns the decoded barcode data.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Barcode successfully decoded",
+                    content = @Content(schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "404", description = "No barcode found in image", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error during scanning", content = @Content)
+    })
+    @PostMapping(consumes = {"multipart/form-data"})
+    public ResponseEntity<Map<String, Object>> scanBarcode(
+            @Parameter(description = "Image file containing the barcode", required = true)
+            @RequestParam("file") MultipartFile file) {
         try {
             long start = System.currentTimeMillis();
             String result = barcodeScannerService.scanImage(file);
