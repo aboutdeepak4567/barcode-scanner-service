@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: barcode-scanner-microservice
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/v1/scan
+    envVars:
+      - key: PORT
+        value: 8080
