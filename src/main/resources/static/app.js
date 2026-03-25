@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
+    const swaggerLink = document.getElementById('swagger-link');
+
+    // Make sure the Swagger link points to the backend (Render), not Vercel
+    if (swaggerLink) {
+        swaggerLink.href = `${API_BASE_URL}/swagger-ui/index.html`;
+    }
     const imagePreview = document.getElementById('image-preview');
     const loadingState = document.getElementById('loading-state');
     const resultContainer = document.getElementById('result-container');
