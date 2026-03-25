@@ -28,6 +28,12 @@ public class BarcodeScannerController {
         this.barcodeScannerService = barcodeScannerService;
     }
 
+    @Operation(summary = "Health check", description = "Verifies the service is running successfully.")
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> healthCheck() {
+        return ResponseEntity.ok(Map.of("success", true, "message", "Scanner API is healthy"));
+    }
+
     @Operation(summary = "Scan a barcode from an uploaded image", description = "Uploads an image, processes it using OpenCV and ZXing, and returns the decoded barcode data.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Barcode successfully decoded",
