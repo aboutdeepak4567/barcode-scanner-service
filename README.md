@@ -1,6 +1,7 @@
 # Barcode Scanner Microservice
 
 A high-performance barcode scanning microservice built with Spring Boot 3 and Java 21. It achieves ~99% accuracy and < 0.5s latency per scan without relying on third-party API licenses.
+https://barcode-scanner-service.vercel.app
 
 ## Architecture
 
