@@ -165,7 +165,15 @@ public class BarcodeScannerService {
                 grayMat = matImage; // Already 1 channel
             }
 
-            Frame processedFrame = toMatConverter.convert(grayMat);
+            // 1. Gaussian Blur: mathematically smooths out low-light camera sensor grain and JPEG compression artifacts
+            Mat blurredMat = new Mat();
+            opencv_imgproc.GaussianBlur(grayMat, blurredMat, new org.bytedeco.opencv.opencv_core.Size(5, 5), 0);
+
+            // 2. Adaptive Gaussian Thresholding: dynamically repairs crumpled/faded ink by aggressively binarizing local pixel neighborhoods
+            Mat thresholdMat = new Mat();
+            opencv_imgproc.adaptiveThreshold(blurredMat, thresholdMat, 255, opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, opencv_imgproc.THRESH_BINARY, 11, 2);
+
+            Frame processedFrame = toMatConverter.convert(thresholdMat);
             return toBufferedImageConverter.getBufferedImage(processedFrame);
         }
     }
