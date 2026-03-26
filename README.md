@@ -16,6 +16,13 @@
 
 This microservice replaces costly third-party commercial scanning licenses by implementing a highly optimized, open-source hybrid scanning pipeline. It achieves **~99% accuracy** and **< 50ms latency** per scan, proving that enterprise-grade barcode scanning can be fully open-source.
 
+<br />
+<div align="center">
+  <img src="screenshot.png" alt="Glassmorphism UI Showcase" width="600" style="border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.5);"/>
+  <p><em>Modern, ultra-fast frontend deployed on Vercel communicating with the Spring Boot backend on Render.</em></p>
+</div>
+<br />
+
 ## 🏗 Architecture
 
 The project is designed with a detached **Split-Stack Architecture** to maximize CDN performance and backend scalability:
