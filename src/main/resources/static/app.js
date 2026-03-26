@@ -145,4 +145,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 2000);
         });
     });
+
+    // Premium 3D Tilt Effect for Interactivity
+    const scannerCard = document.querySelector('.scanner-card');
+    if (scannerCard) {
+        document.addEventListener('mousemove', (e) => {
+            // Calculate mouse distance from center to dictate tilt intensity
+            const xAxis = (window.innerWidth / 2 - e.pageX) / 45;
+            const yAxis = (window.innerHeight / 2 - e.pageY) / 45;
+            
+            // Apply 3D perspective rotation and dynamic shadow length
+            scannerCard.style.transform = `perspective(1000px) rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            scannerCard.style.boxShadow = `${-xAxis}px ${yAxis}px 50px rgba(0,0,0,0.5)`;
+        });
+        
+        // Reset position when mouse leaves the document window
+        document.addEventListener('mouseleave', () => {
+            scannerCard.style.transform = `perspective(1000px) rotateY(0deg) rotateX(0deg)`;
+            scannerCard.style.boxShadow = `0 25px 50px -12px rgba(0, 0, 0, 0.5)`;
+        });
+    }
 });

@@ -127,7 +127,8 @@ body {
     border-radius: 24px;
     padding: 2.5rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    transition: all 0.3s ease;
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+    will-change: transform;
 }
 
 .hidden {
