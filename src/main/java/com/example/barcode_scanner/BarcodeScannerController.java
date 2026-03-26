@@ -102,4 +102,34 @@ public class BarcodeScannerController {
             ));
         }
     }
+
+    @Operation(summary = "Batch scan barcodes from a ZIP file", description = "Uploads a ZIP file of images, parses them via Project Loom Virtual Threads, and returns decodes en-masse.")
+    @PostMapping(value = "/batch", consumes = {"multipart/form-data"})
+    public ResponseEntity<Map<String, Object>> scanBatch(
+            @Parameter(description = "ZIP file containing multiple barcode images", required = true)
+            @RequestParam("file") MultipartFile zipFile,
+            HttpServletRequest request) {
+            
+        String clientIp = request.getRemoteAddr();
+        Bucket bucket = resolveBucket(clientIp);
+
+        // Batch scans cost 10 tokens instead of 1!
+        if (!bucket.tryConsume(10)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("success", false, "error", "Rate limit exceeded for batch requests. Costs 10 tokens."));
+        }
+
+        try {
+            if (!zipFile.getOriginalFilename().toLowerCase().endsWith(".zip")) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "File must be a valid .zip archive"));
+            }
+
+            Map<String, Object> batchResults = barcodeScannerService.processZipBatch(zipFile);
+            return ResponseEntity.ok(batchResults);
+            
+        } catch (Exception e) {
+            log.error("Batch processing error", e);
+            return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage() != null ? e.getMessage() : "Unknown batch error"));
+        }
+    }
 }

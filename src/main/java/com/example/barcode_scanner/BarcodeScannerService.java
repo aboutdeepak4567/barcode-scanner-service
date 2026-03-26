@@ -18,39 +18,35 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 @Slf4j
 @Service
 public class BarcodeScannerService {
 
-    // Caffeine Cache for MD5 Image hashes
     private final Cache<String, String> barcodeCache = Caffeine.newBuilder()
             .maximumSize(5000)
-            .expireAfterWrite(java.time.Duration.ofHours(24))
+            .expireAfterWrite(Duration.ofHours(24))
             .build();
 
-    private final MultiFormatReader barcodeReader;
-    
-    // JavaCV Converters for OpenCV interop
-    private final OpenCVFrameConverter.ToMat toMatConverter;
-    private final Java2DFrameConverter toBufferedImageConverter;
-
-    public BarcodeScannerService() {
-        this.barcodeReader = new MultiFormatReader();
-        Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
-        hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
-        this.barcodeReader.setHints(hints);
-
-        this.toMatConverter = new OpenCVFrameConverter.ToMat();
-        this.toBufferedImageConverter = new Java2DFrameConverter();
+    public String scanImage(MultipartFile file) throws IOException, NotFoundException {
+        return scanImageBytes(file.getBytes());
     }
 
-    public String scanImage(MultipartFile file) throws IOException, NotFoundException {
+    public String scanImageBytes(byte[] fileBytes) throws IOException, NotFoundException {
         long startTime = System.currentTimeMillis();
-        byte[] fileBytes = file.getBytes();
         String fileHash = DigestUtils.md5DigestAsHex(fileBytes);
 
         String cachedResult = barcodeCache.getIfPresent(fileHash);
@@ -64,7 +60,6 @@ public class BarcodeScannerService {
             throw new IllegalArgumentException("Could not read image data");
         }
 
-        // 1. Try fast ZXing decode first for pristine images (lowest latency)
         try {
             String result = decode(originalImage, startTime);
             barcodeCache.put(fileHash, result);
@@ -73,51 +68,105 @@ public class BarcodeScannerService {
             log.debug("Standard decode failed, falling back to OpenCV preprocessing pipeline...");
         }
 
-        // 2. OpenCV Fallback Preprocessing: Grayscale & Contrast Enhancement
         BufferedImage preprocessedImage = preprocessWithOpenCV(originalImage);
-
-        // 3. Second decode attempt on enhanced image
         String finalResult = decode(preprocessedImage, startTime);
         barcodeCache.put(fileHash, finalResult);
         return finalResult;
     }
-    
+
+    public Map<String, Object> processZipBatch(MultipartFile zipFile) throws IOException {
+        long globalStart = System.currentTimeMillis();
+        Map<String, String> results = new ConcurrentHashMap<>();
+        List<Future<Void>> futures = new ArrayList<>();
+
+        // Create a Java 21 Project Loom Virtual Thread Executor!
+        // This will spawn an ultra-lightweight thread for every single image in the zip concurrently!
+        try (ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
+             ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+             
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory() || !isImageFile(entry.getName())) {
+                    continue;
+                }
+
+                String filename = entry.getName();
+                
+                // Read bytes fully from the stream for each file
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                byte[] data = new byte[1024];
+                int count;
+                while ((count = zis.read(data, 0, 1024)) != -1) {
+                    buffer.write(data, 0, count);
+                }
+                final byte[] imageBytes = buffer.toByteArray();
+
+                // Submit to Virtual Thread
+                futures.add(virtualThreadExecutor.submit(() -> {
+                    try {
+                        String decodedText = scanImageBytes(imageBytes);
+                        results.put(filename, decodedText);
+                    } catch (NotFoundException e) {
+                        results.put(filename, "ERROR: No barcode detected");
+                    } catch (Exception e) {
+                        results.put(filename, "ERROR: " + e.getMessage());
+                    }
+                    return null;
+                }));
+            }
+            
+            // Wait for all virtual threads to beautifully execute concurrently
+            for (Future<Void> future : futures) {
+                try { future.get(); } catch (Exception ignored) {}
+            }
+        }
+        
+        return Map.of(
+            "totalProcessed", results.size(),
+            "results", results,
+            "totalLatencyMs", System.currentTimeMillis() - globalStart
+        );
+    }
+
+    private boolean isImageFile(String filename) {
+        String lower = filename.toLowerCase();
+        return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".webp");
+    }
+
     private String decode(BufferedImage image, long globalStartTime) throws NotFoundException {
+        // Instantiate locally for 100% thread-safety inside Virtual Threads
+        MultiFormatReader barcodeReader = new MultiFormatReader();
+        Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+        hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+        barcodeReader.setHints(hints);
+
         LuminanceSource source = new BufferedImageLuminanceSource(image);
         BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
 
         Result result = barcodeReader.decodeWithState(bitmap);
-        
-        long latency = System.currentTimeMillis() - globalStartTime;
-        log.info("Barcode decoded successfully in {}ms: {}", latency, result.getText());
         return result.getText();
     }
 
     private BufferedImage preprocessWithOpenCV(BufferedImage image) {
-        // Convert BufferedImage to JavaCV Frame, then to OpenCV Mat
-        Frame frame = toBufferedImageConverter.convert(image);
-        Mat matImage = toMatConverter.convert(frame);
-        
-        Mat grayMat = new Mat();
-        
-        // Convert to Grayscale
-        // Handle images with alpha channels (ARGB/RGBA) natively
-        int channels = matImage.channels();
-        if (channels == 3) {
-            opencv_imgproc.cvtColor(matImage, grayMat, opencv_imgproc.COLOR_BGR2GRAY);
-        } else if (channels == 4) {
-            opencv_imgproc.cvtColor(matImage, grayMat, opencv_imgproc.COLOR_BGRA2GRAY);
-        } else {
-            grayMat = matImage; // Already 1 channel
-        }
-        
-        // Optional: Morphological operations or thresholding can be added here
-        // to further enhance barcode lines before handing back to ZXing.
-        // A simple adaptive threshold often dramatically improves barcode detection
-        // opencv_imgproc.adaptiveThreshold(grayMat, enhancedMat, 255, opencv_imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, opencv_imgproc.THRESH_BINARY, 11, 2);
+        // Instantiate locally for 100% thread-safety inside Virtual Threads
+        try (Java2DFrameConverter toBufferedImageConverter = new Java2DFrameConverter();
+             OpenCVFrameConverter.ToMat toMatConverter = new OpenCVFrameConverter.ToMat()) {
+             
+            Frame frame = toBufferedImageConverter.convert(image);
+            Mat matImage = toMatConverter.convert(frame);
+            Mat grayMat = new Mat();
+            
+            int channels = matImage.channels();
+            if (channels == 3) {
+                opencv_imgproc.cvtColor(matImage, grayMat, opencv_imgproc.COLOR_BGR2GRAY);
+            } else if (channels == 4) {
+                opencv_imgproc.cvtColor(matImage, grayMat, opencv_imgproc.COLOR_BGRA2GRAY);
+            } else {
+                grayMat = matImage; // Already 1 channel
+            }
 
-        // Convert back
-        Frame processedFrame = toMatConverter.convert(grayMat);
-        return toBufferedImageConverter.getBufferedImage(processedFrame);
+            Frame processedFrame = toMatConverter.convert(grayMat);
+            return toBufferedImageConverter.getBufferedImage(processedFrame);
+        }
     }
 }
