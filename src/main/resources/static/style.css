@@ -357,6 +357,41 @@ body {
     background: rgba(255,255,255,0.1);
 }
 
+/* Batch Results List */
+.batch-list {
+    list-style: none;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 1rem;
+    padding-right: 10px;
+}
+.batch-list::-webkit-scrollbar { width: 6px; }
+.batch-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+}
+.batch-list li {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.9rem;
+    word-break: break-all;
+    gap: 15px;
+}
+.batch-list li strong {
+    color: var(--accent);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
 .reset-btn {
     width: 100%;
     padding: 16px;

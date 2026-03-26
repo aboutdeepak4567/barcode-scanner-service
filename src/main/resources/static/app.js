@@ -19,12 +19,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingState = document.getElementById('loading-state');
     const resultContainer = document.getElementById('result-container');
     const errorContainer = document.getElementById('error-container');
-    const decodedText = document.getElementById('decoded-text');
+    const scannedData = document.getElementById('scanned-data');
     const latencyBadge = document.getElementById('latency-badge');
     const errorMessage = document.getElementById('error-message');
     const copyBtn = document.getElementById('copy-btn');
     const resetBtns = document.querySelectorAll('.reset-btn');
     const scanLine = document.getElementById('scan-line');
+    
+    // Batch UI Elements
+    const singleDataDisplay = document.getElementById('single-data-display');
+    const batchDataDisplay = document.getElementById('batch-data-display');
+    const batchResultsList = document.getElementById('batch-results-list');
+    const batchCountSpan = document.getElementById('batch-count');
+    const batchLatencySpan = document.getElementById('batch-latency');
 
     // Drag and Drop Events
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -59,12 +66,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function handleFile(file) {
-        if (!file.type.startsWith('image/')) {
-            showError("Please upload a valid image file.");
+        if (file.name.toLowerCase().endsWith('.zip')) {
+            imagePreview.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2300f2fe"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2M13 13V15H11V13H9V11H11V9H13V11H15V13H13Z"/></svg>';
+            showState('preview');
+            scanBatchZip(file);
             return;
         }
 
-        // Show preview
+        if (!file.type.startsWith('image/')) {
+            showError("Please upload a valid image file or a .zip archive.");
+            return;
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = function() {
@@ -97,8 +110,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function scanBatchZip(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/v1/scan/batch`, { method: 'POST', body: formData });
+            const result = await response.json();
+            if (response.ok) {
+                showBatchSuccess(result);
+            } else {
+                showError(result.error || "Failed to parse ZIP file.");
+            }
+        } catch (error) {
+            console.error('Network Error:', error);
+            showError("Network error occurred connecting to the backend.");
+        }
+    }
+
     function showState(state) {
-        // Reset all
         loadingState.classList.add('hidden');
         resultContainer.classList.add('hidden');
         errorContainer.classList.add('hidden');
@@ -119,8 +148,31 @@ document.addEventListener('DOMContentLoaded', () => {
         scanLine.classList.add('hidden');
         loadingState.classList.add('hidden');
         resultContainer.classList.remove('hidden');
+        
+        batchDataDisplay.classList.add('hidden');
+        singleDataDisplay.classList.remove('hidden');
         decodedText.textContent = text;
         latencyBadge.textContent = `⚡ ${latency}ms`;
+    }
+
+    function showBatchSuccess(data) {
+        scanLine.classList.add('hidden');
+        loadingState.classList.add('hidden');
+        resultContainer.classList.remove('hidden');
+        
+        singleDataDisplay.classList.add('hidden');
+        batchDataDisplay.classList.remove('hidden');
+        
+        batchCountSpan.textContent = data.totalProcessed;
+        batchLatencySpan.textContent = data.totalLatencyMs;
+        latencyBadge.textContent = `⚡ ${data.totalLatencyMs}ms Batch`;
+        
+        batchResultsList.innerHTML = '';
+        for (const [filename, extract] of Object.entries(data.results)) {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${filename}</strong> <span>${extract}</span>`;
+            batchResultsList.appendChild(li);
+        }
     }
 
     function showError(msg) {
