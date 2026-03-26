@@ -39,7 +39,12 @@ public class BarcodeScannerService {
     private final Cache<String, String> barcodeCache = Caffeine.newBuilder()
             .maximumSize(5000)
             .expireAfterWrite(Duration.ofHours(24))
+            .recordStats() // Enable detailed hit/miss cache tracking
             .build();
+
+    public BarcodeScannerService(io.micrometer.core.instrument.MeterRegistry meterRegistry) {
+        io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics.monitor(meterRegistry, barcodeCache, "barcode_cache_lru");
+    }
 
     public String scanImage(MultipartFile file) throws IOException, NotFoundException {
         return scanImageBytes(file.getBytes());
