@@ -3,7 +3,10 @@ package com.example.barcode_scanner;
 import com.google.zxing.*;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.DigestUtils;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
@@ -23,6 +26,12 @@ import java.util.Map;
 @Service
 public class BarcodeScannerService {
 
+    // Caffeine Cache for MD5 Image hashes
+    private final Cache<String, String> barcodeCache = Caffeine.newBuilder()
+            .maximumSize(5000)
+            .expireAfterWrite(java.time.Duration.ofHours(24))
+            .build();
+
     private final MultiFormatReader barcodeReader;
     
     // JavaCV Converters for OpenCV interop
@@ -41,15 +50,25 @@ public class BarcodeScannerService {
 
     public String scanImage(MultipartFile file) throws IOException, NotFoundException {
         long startTime = System.currentTimeMillis();
+        byte[] fileBytes = file.getBytes();
+        String fileHash = DigestUtils.md5DigestAsHex(fileBytes);
 
-        BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(file.getBytes()));
+        String cachedResult = barcodeCache.getIfPresent(fileHash);
+        if (cachedResult != null) {
+            log.info("⚡ Cache HIT! Instantly returning decoded barcode for hash: {}", fileHash);
+            return cachedResult;
+        }
+
+        BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(fileBytes));
         if (originalImage == null) {
             throw new IllegalArgumentException("Could not read image data");
         }
 
         // 1. Try fast ZXing decode first for pristine images (lowest latency)
         try {
-            return decode(originalImage, startTime);
+            String result = decode(originalImage, startTime);
+            barcodeCache.put(fileHash, result);
+            return result;
         } catch (NotFoundException e) {
             log.debug("Standard decode failed, falling back to OpenCV preprocessing pipeline...");
         }
@@ -58,7 +77,9 @@ public class BarcodeScannerService {
         BufferedImage preprocessedImage = preprocessWithOpenCV(originalImage);
 
         // 3. Second decode attempt on enhanced image
-        return decode(preprocessedImage, startTime);
+        String finalResult = decode(preprocessedImage, startTime);
+        barcodeCache.put(fileHash, finalResult);
+        return finalResult;
     }
     
     private String decode(BufferedImage image, long globalStartTime) throws NotFoundException {
