@@ -39,8 +39,8 @@ public class BarcodeScannerController {
 
     private Bucket resolveBucket(String ip) {
         return rateLimitBuckets.computeIfAbsent(ip, key -> {
-            Refill refill = Refill.intervally(50, Duration.ofMinutes(1)); // 50 requests per minute
-            Bandwidth limit = Bandwidth.classic(50, refill);
+            Refill refill = Refill.intervally(1, Duration.ofMinutes(1)); // 1 request per minute
+            Bandwidth limit = Bandwidth.classic(1, refill);
             return Bucket.builder().addLimit(limit).build();
         });
     }
@@ -74,7 +74,7 @@ public class BarcodeScannerController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of(
                             "success", false,
-                            "error", "Rate limit exceeded. You are restricted to 50 barcode scans per minute. Please try again later."
+                            "error", "Rate limit exceeded. You are restricted to 1 barcode scan per minute. Please try again later."
                     ));
         }
             
