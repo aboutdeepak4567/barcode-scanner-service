@@ -16,6 +16,15 @@
 
 This microservice replaces costly third-party commercial scanning licenses by implementing a highly optimized, open-source hybrid scanning pipeline. It achieves **~99% accuracy** and **< 50ms latency** per scan, proving that enterprise-grade barcode scanning can be fully open-source.
 
+## ✨ Key Enterprise Features
+
+- **Java 21 Project Loom (Virtual Threads)**: Features a dedicated `POST /api/v1/scan/batch` endpoint. Upload a `.zip` archive containing 1,000 barcode images and instantly process them entirely concurrently in parallel using ultra-lightweight OS virtual threads.
+- **Advanced Morphological Vision Repair**: OpenCV natively rescues physically crumpled, blurry, or low-light sensor images via deep localized `GaussianBlur` and `adaptiveThreshold` binarization before handing over to ZXing.
+- **Sub-1ms Caffeine LRU Caching**: Uploads are internally hashed via MD5. Identical images bypass the compute-heavy OpenCV/ZXing pipeline instantly, yielding sub-1ms response times.
+- **Bucket4j API Rate Limiting**: Production-hardened endpoint security strictly caps client IPs using Token-Bucket algorithms, effortlessly mitigating malicious infrastructure abuse and DDoS attempts.
+- **Deep Observability & Telemetry**: Fully instrumented with Spring Boot Actuator and a Micrometer Prometheus registry. Hook up Grafana to instantly chart live CPU load, thread starvation, and real-time Caffeine Cache Hit vs. Miss distribution globally via `/actuator/prometheus`.
+- **Dynamic 3D Glassmorphism UI**: Beautifully designed tracking frontend natively supporting both single frames and drag-and-drop mass `.zip` batch payloads.
+
 <br />
 <div align="center">
 
